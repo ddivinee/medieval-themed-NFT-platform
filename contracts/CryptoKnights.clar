@@ -156,3 +156,12 @@
             (map-delete tavern-listings { knight-id: knight-id })
             (ok true))))
 
+;; Remove knight from tavern listing
+(define-public (remove-from-tavern (knight-id uint))
+    (begin
+        (asserts! (<= knight-id (var-get knight-counter)) err-invalid-input)
+        (let ((listing (unwrap! (map-get? tavern-listings { knight-id: knight-id }) err-not-found)))
+            (asserts! (is-eq tx-sender (get seller listing)) err-not-authorized)
+            (map-delete tavern-listings { knight-id: knight-id })
+            (ok true))))
+
