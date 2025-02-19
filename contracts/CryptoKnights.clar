@@ -85,3 +85,74 @@
         (var-set knight-counter knight-id)
         (ok knight-id)))
 
+;; Batch Transfer knights
+(define-public (batch-transfer-knights 
+    (knight-ids (list 10 uint)) 
+    (recipients (list 10 principal)))
+    (begin
+        (asserts! (and 
+            (> (len knight-ids) u0)
+            (<= (len knight-ids) max-batch-size)
+            (is-eq (len knight-ids) (len recipients))) 
+            err-invalid-input)
+        (let ((transfers 
+            (map transfer-single-knight 
+                knight-ids 
+                recipients)))
+            (ok transfers))))
+
+;; Helper function for batch transfer
+(define-private (transfer-single-knight 
+    (knight-id uint)
+    (recipient principal))
+    (let 
+        ((knight (unwrap-panic (get-knight-checked knight-id))))
+        (asserts! (and
+                (is-eq (get owner knight) tx-sender)
+                (get tradeable knight)
+                (not (is-eq recipient tx-sender)))
+            err-not-authorized)
+        (map-set knights
+            { knight-id: knight-id }
+            { owner: recipient,
+              metadata-uri: (get metadata-uri knight),
+              tradeable: (get tradeable knight) })
+        (ok true)))
+
+;; List knight in tavern for sale
+(define-public (list-knight-in-tavern (knight-id uint) (price uint))
+    (begin
+        (asserts! (<= knight-id (var-get knight-counter)) err-invalid-input)
+        (let ((knight (try! (get-knight-checked knight-id))))
+            (asserts! (and 
+                    (is-eq (get owner knight) tx-sender)
+                    (> price u0)
+                    (get tradeable knight))
+                err-invalid-price)
+            (map-set tavern-listings
+                { knight-id: knight-id }
+                { seller: tx-sender, 
+                  price: price, 
+                  listed-at: block-height })
+            (ok true))))
+
+;; Purchase knight from tavern
+(define-public (purchase-knight (knight-id uint))
+    (begin
+        (asserts! (<= knight-id (var-get knight-counter)) err-invalid-input)
+        (let
+            ((knight (try! (get-knight-checked knight-id)))
+             (listing (unwrap! (map-get? tavern-listings { knight-id: knight-id }) err-not-found)))
+            (asserts! (and
+                    (not (is-eq (get seller listing) tx-sender))
+                    (get tradeable knight))
+                err-not-authorized)
+            (try! (stx-transfer? (get price listing) tx-sender (get seller listing)))
+            (map-set knights
+                { knight-id: knight-id }
+                { owner: tx-sender,
+                  metadata-uri: (get metadata-uri knight),
+                  tradeable: (get tradeable knight) })
+            (map-delete tavern-listings { knight-id: knight-id })
+            (ok true))))
+
