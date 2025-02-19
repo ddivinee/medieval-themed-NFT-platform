@@ -165,3 +165,32 @@
             (map-delete tavern-listings { knight-id: knight-id })
             (ok true))))
 
+;; Update knight stats
+(define-public (update-knight-stats (honor-points uint) (rank uint))
+    (begin
+        (asserts! (<= honor-points max-honor-points) err-invalid-input)
+        (asserts! (<= rank max-knight-rank) err-invalid-input)
+        (map-set knight-stats
+            { player: tx-sender }
+            { honor-points: honor-points, rank: rank })
+        (ok true)))
+
+;; Read-only Functions
+
+;; Get knight details
+(define-read-only (get-knight-details (knight-id uint))
+    (if (<= knight-id (var-get knight-counter))
+        (map-get? knights { knight-id: knight-id })
+        none))
+
+;; Get tavern listing details
+(define-read-only (get-tavern-listing (knight-id uint))
+    (map-get? tavern-listings { knight-id: knight-id }))
+
+;; Get knight stats
+(define-read-only (get-knight-stats (player principal))
+    (map-get? knight-stats { player: player }))
+
+;; Get total knights minted
+(define-read-only (get-total-knights)
+    (var-get knight-counter))
